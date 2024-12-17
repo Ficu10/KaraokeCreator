@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remove Vocals</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Remove Vocals from Your Audio File</h1>
+        <p>Upload a file (MP3 or WAV) to remove vocals and download the instrumental version.</p>
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <input type="file" name="audio" accept=".mp3, .wav" required>
+            <button type="submit">Upload & Process</button>
+        </form>
+        <div class="instructions">
+            <p>Supported formats: MP3, WAV.</p>
+            <p>Max file size: 50MB</p>
+        </div>
+    </div>
+</body>
+</html>
