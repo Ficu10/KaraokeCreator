@@ -4,8 +4,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karaoke Processor</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #222;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            margin: 20px 0;
+        }
+
+        #uploadForm {
+            margin-bottom: 20px;
+        }
+
+        #karaokeSection {
+            display: none;
+            margin-top: 20px;
+        }
+
+        #audioPlayer {
+            width: 80%;
+            margin-bottom: 20px;
+        }
+
+        #karaokeContainer {
+            width: 80%;
+            margin: 0 auto;
+            overflow: hidden;
+            position: relative;
+            height: 150px;
+            background: black;
+            border: 2px solid #444;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #karaokeText {
+            position: absolute;
+            white-space: nowrap;
+            font-size: 36px;
+            color: #aaa;
+            top: 20%;
+            transform: translateX(-50%);
+            transition: transform 0.5s ease-out;
+        }
+
+        #karaokeText span {
+            margin: 0 10px;
+        }
+
+        #karaokeText span.current {
+            color: red;
+            font-weight: bold;
+            display: block;
+            font-size: 40px;
+        }
+
+        #karaokeBottomText {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: red;
+            white-space: nowrap;
+        }
+
+        #topLine {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 36px;
+            white-space: nowrap;
+            color: #aaa;
+        }
+    </style>
 </head>
 <body>
     <h1>Karaoke Processor</h1>
@@ -13,76 +93,95 @@
     <form id="uploadForm">
         <label for="audioFile">Wybierz plik audio:</label>
         <input type="file" id="audioFile" name="audio" accept=".mp3,.wav" required>
-
         <label for="language">Wybierz język:</label>
         <select id="language" name="language">
             <option value="pl" selected>Polski</option>
             <option value="en">Angielski</option>
-            <option value="de">Niemiecki</option>
-            <option value="fr">Francuski</option>
             <option value="es">Hiszpański</option>
-            <option value="it">Włoski</option>
         </select>
-
         <button type="button" id="transcribeBtn">Transkrybuj</button>
-        <button type="button" id="processBtn">Usuń Wokal</button>
     </form>
 
-    <div id="results" style="display:none;">
-        <h2>Transkrypcja</h2>
-        <p id="transcription"></p>
-        <h2>Plik bez wokalu</h2>
-        <audio controls id="processedAudio"></audio>
+    <div id="karaokeSection">
+        <audio id="audioPlayer" controls></audio>
+        <div id="karaokeContainer">
+            <div id="topLine"></div>
+            <div id="karaokeBottomText"></div>
+        </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script>
         const transcribeBtn = document.getElementById('transcribeBtn');
-        const processBtn = document.getElementById('processBtn');
-        const fileInput = document.getElementById('audioFile');
-        const languageInput = document.getElementById('language');
-        const results = document.getElementById('results');
-        const transcription = document.getElementById('transcription');
-        const audioElement = document.getElementById('processedAudio');
+        const audioFile = document.getElementById('audioFile');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const topLine = document.getElementById('topLine');
+        const bottomText = document.getElementById('karaokeBottomText');
+        const languageSelect = document.getElementById('language');
 
-        function uploadFile(url, callback, includeLanguage = false) {
-            const formData = new FormData();
-            formData.append('audio', fileInput.files[0]);
-
-            if (includeLanguage) {
-                formData.append('language', languageInput.value);
-            }
-
-            NProgress.start();
-
-            fetch(url, { method: 'POST', body: formData })
-                .then(response => response.json())
-                .then(callback)
-                .catch(err => alert('Błąd: ' + err))
-                .finally(() => NProgress.done());
-        }
+        let words = [];
+        let currentIndex = 0;
 
         transcribeBtn.addEventListener('click', () => {
-            uploadFile('/transcribe', data => {
-                if (data.error) {
-                    alert(data.error);
-                } else {
-                    transcription.textContent = data.transcription;
-                    results.style.display = 'block';
-                }
-            }, true);
+            const formData = new FormData();
+            formData.append('audio', audioFile.files[0]);
+            formData.append('language', languageSelect.value);
+
+            fetch('/transcribe', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    words = data.transcription;
+                    renderKaraoke();
+                    const audioURL = URL.createObjectURL(audioFile.files[0]);
+                    audioPlayer.src = audioURL;
+                    document.getElementById('karaokeSection').style.display = 'block';
+                    animateKaraoke();
+                });
         });
 
-        processBtn.addEventListener('click', () => {
-            uploadFile('/process_audio', data => {
-                if (data.error) {
-                    alert(data.error);
-                } else {
-                    audioElement.src = data.audio_url;
-                    results.style.display = 'block';
+        function renderKaraoke() {
+            topLine.innerHTML = '';
+            bottomText.innerHTML = '';
+        }
+
+        function animateKaraoke() {
+            audioPlayer.addEventListener('timeupdate', () => {
+                const currentTime = audioPlayer.currentTime;
+
+                let activeIndex = -1;
+
+                // Znalezienie aktualnego słowa
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    if (currentTime >= word.start && currentTime <= word.end) {
+                        activeIndex = i;
+                        break;
+                    }
+                }
+
+                if (activeIndex !== -1 && activeIndex !== currentIndex) {
+                    currentIndex = activeIndex;
+                    updateKaraokeView();
                 }
             });
-        });
+        }
+
+        function updateKaraokeView() {
+            const surroundingWords = 7;
+
+            const start = Math.max(0, currentIndex - surroundingWords);
+            const end = Math.min(words.length, currentIndex + surroundingWords);
+
+            const topLineText = words.slice(start, currentIndex).map(w => w.word).join(' ');
+            const bottomLineText = words[currentIndex].word;
+            const bottomLineTextRight = words.slice(currentIndex + 1, end).map(w => w.word).join(' ');
+
+            topLine.textContent = `${topLineText}`;
+            bottomText.innerHTML = `${bottomLineText}`;
+        }
     </script>
 </body>
 </html>

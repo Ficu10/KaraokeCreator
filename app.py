@@ -22,7 +22,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 # Ładowanie modelu Whisper
-model = whisper.load_model("medium")
+model = whisper.load_model("tiny")
 
 def allowed_file(filename):
     """Sprawdzenie czy plik jest odpowiedniego formatu."""
@@ -66,7 +66,7 @@ def transcribe_file():
         return jsonify({'error': 'Nie przesłano pliku'}), 400
 
     file = request.files['audio']
-    language = request.form.get('language', 'pl')  # Domyślny język to "pl"
+    language = request.form.get('language', 'pl')
 
     if not allowed_file(file.filename):
         return jsonify({'error': 'Nieobsługiwany typ pliku'}), 400
@@ -76,8 +76,12 @@ def transcribe_file():
 
     try:
         file.save(input_path)
-        transcript = model.transcribe(input_path, language=language, temperature=0.0)['text']
-        return jsonify({'transcription': transcript})
+        # Transkrypcja z podziałem na słowa
+        result = model.transcribe(input_path, language=language, word_timestamps=True)
+        words_with_timestamps = [{'word': word['word'], 'start': word['start'], 'end': word['end']}
+                                 for segment in result['segments'] for word in segment['words']]
+
+        return jsonify({'transcription': words_with_timestamps})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
