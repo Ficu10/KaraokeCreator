@@ -44,46 +44,31 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
 
-        #karaokeText {
+        #topLine, #karaokeBottomText {
             position: absolute;
-            white-space: nowrap;
-            font-size: 36px;
-            color: #aaa;
-            top: 20%;
-            transform: translateX(-50%);
-            transition: transform 0.5s ease-out;
-        }
-
-        #karaokeText span {
-            margin: 0 10px;
-        }
-
-        #karaokeText span.current {
-            color: red;
-            font-weight: bold;
-            display: block;
-            font-size: 40px;
-        }
-
-        #karaokeBottomText {
-            position: absolute;
-            bottom: 10px;
             width: 100%;
             text-align: center;
-            font-size: 48px;
-            font-weight: bold;
-            color: red;
-            white-space: nowrap;
+            font-size: 40px;
+            transition: transform 0.5s ease-in-out;
+            color: #aaa;
         }
 
         #topLine {
-            position: absolute;
             top: 10px;
-            width: 100%;
-            text-align: center;
-            font-size: 36px;
-            white-space: nowrap;
-            color: #aaa;
+        }
+
+        #karaokeBottomText {
+            bottom: 10px;
+            color: #ccc;
+        }
+
+        .animate-up {
+            transform: translateY(-100%);
+        }
+
+        .current-line {
+            color: red;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -119,7 +104,8 @@
         const languageSelect = document.getElementById('language');
 
         let words = [];
-        let currentIndex = 0;
+        let currentLineIndex = 0;
+        let lines = [];
 
         transcribeBtn.addEventListener('click', () => {
             const formData = new FormData();
@@ -133,8 +119,11 @@
                         alert(data.error);
                         return;
                     }
+
                     words = data.transcription;
+                    lines = splitIntoLines(words, 7); // Podział na linie po 7 słów
                     renderKaraoke();
+
                     const audioURL = URL.createObjectURL(audioFile.files[0]);
                     audioPlayer.src = audioURL;
                     document.getElementById('karaokeSection').style.display = 'block';
@@ -142,45 +131,50 @@
                 });
         });
 
+        function splitIntoLines(words, wordsPerLine = 7) {
+            const lines = [];
+            for (let i = 0; i < words.length; i += wordsPerLine) {
+                const lineWords = words.slice(i, i + wordsPerLine);
+                lines.push(lineWords.map(wordObj => wordObj.word).join(' '));
+            }
+            return lines;
+        }
+
         function renderKaraoke() {
-            topLine.innerHTML = '';
-            bottomText.innerHTML = '';
+            topLine.innerHTML = lines[0] || '';
+            bottomText.innerHTML = lines[1] || '';
         }
 
         function animateKaraoke() {
             audioPlayer.addEventListener('timeupdate', () => {
                 const currentTime = audioPlayer.currentTime;
 
-                let activeIndex = -1;
+                let activeLineIndex = -1;
 
-                // Znalezienie aktualnego słowa
                 for (let i = 0; i < words.length; i++) {
                     const word = words[i];
                     if (currentTime >= word.start && currentTime <= word.end) {
-                        activeIndex = i;
+                        activeLineIndex = Math.floor(i / 7);
                         break;
                     }
                 }
 
-                if (activeIndex !== -1 && activeIndex !== currentIndex) {
-                    currentIndex = activeIndex;
+                if (activeLineIndex !== -1 && activeLineIndex !== currentLineIndex) {
+                    currentLineIndex = activeLineIndex;
                     updateKaraokeView();
                 }
             });
         }
 
         function updateKaraokeView() {
-            const surroundingWords = 7;
+            const currentLine = lines[currentLineIndex] || '';
+            const nextLine = lines[currentLineIndex + 1] || '';
 
-            const start = Math.max(0, currentIndex - surroundingWords);
-            const end = Math.min(words.length, currentIndex + surroundingWords);
+            // Aktualizacja treści
+            topLine.innerHTML = `<span class="current-line">${currentLine}</span>`;
+            bottomText.textContent = nextLine;
 
-            const topLineText = words.slice(start, currentIndex).map(w => w.word).join(' ');
-            const bottomLineText = words[currentIndex].word;
-            const bottomLineTextRight = words.slice(currentIndex + 1, end).map(w => w.word).join(' ');
-
-            topLine.textContent = `${topLineText}`;
-            bottomText.innerHTML = `${bottomLineText}`;
+           
         }
     </script>
 </body>
