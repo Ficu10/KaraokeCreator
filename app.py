@@ -89,28 +89,47 @@ def transcribe_file():
             os.remove(input_path)
 
 
-@app.route('/process_audio', methods=['POST'])
-def process_audio():
+@app.route('/process', methods=['POST'])
+def process_file():
     if 'audio' not in request.files:
         return jsonify({'error': 'Nie przesłano pliku'}), 400
 
     file = request.files['audio']
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Nieobsługiwany typ pliku'}), 400
+    language = request.form.get('language', 'pl')  # Domyślnie angielski, jeśli nie wybrano języka
+
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({'error': 'Nieobsługiwany plik'}), 400
 
     unique_filename = f"{uuid.uuid4()}_{secure_filename(file.filename)}"
     input_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
 
     try:
         file.save(input_path)
+
+        # Usuń wokal
         processed_audio_path = remove_vocals_with_demucs(input_path)
+
+        # Transkrypcja
+        transcript_data = model.transcribe(input_path, language=language, temperature=0.0)['segments']
+        transcription = [
+            {
+                'start': segment['start'],
+                'end': segment['end'],
+                'word': segment['text']
+            }
+            for segment in transcript_data
+        ]
+
         audio_url = url_for('static', filename=f'processed/{os.path.basename(processed_audio_path)}')
-        return jsonify({'audio_url': audio_url})
+
+        return jsonify({'audio_url': audio_url, 'transcription': transcription})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         if os.path.exists(input_path):
             os.remove(input_path)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)

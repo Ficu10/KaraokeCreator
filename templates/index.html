@@ -44,11 +44,11 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
         }
 
-        #topLine, #karaokeBottomText {
+        #topLine, #bottomLine {
             position: absolute;
             width: 100%;
             text-align: center;
-            font-size: 40px;
+            font-size: 30px;
             transition: transform 0.5s ease-in-out;
             color: #aaa;
         }
@@ -57,13 +57,9 @@
             top: 10px;
         }
 
-        #karaokeBottomText {
+        #bottomLine {
             bottom: 10px;
             color: #ccc;
-        }
-
-        .animate-up {
-            transform: translateY(-100%);
         }
 
         .current-line {
@@ -91,7 +87,7 @@
         <audio id="audioPlayer" controls></audio>
         <div id="karaokeContainer">
             <div id="topLine"></div>
-            <div id="karaokeBottomText"></div>
+            <div id="bottomLine"></div>
         </div>
     </div>
 
@@ -100,19 +96,19 @@
         const audioFile = document.getElementById('audioFile');
         const audioPlayer = document.getElementById('audioPlayer');
         const topLine = document.getElementById('topLine');
-        const bottomText = document.getElementById('karaokeBottomText');
+        const bottomLine = document.getElementById('bottomLine');
         const languageSelect = document.getElementById('language');
 
         let words = [];
-        let currentLineIndex = 0;
         let lines = [];
+        let currentLineIndex = 0;
 
         transcribeBtn.addEventListener('click', () => {
             const formData = new FormData();
             formData.append('audio', audioFile.files[0]);
             formData.append('language', languageSelect.value);
 
-            fetch('/transcribe', { method: 'POST', body: formData })
+            fetch('/process', { method: 'POST', body: formData })
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -124,8 +120,7 @@
                     lines = splitIntoLines(words, 7); // Podział na linie po 7 słów
                     renderKaraoke();
 
-                    const audioURL = URL.createObjectURL(audioFile.files[0]);
-                    audioPlayer.src = audioURL;
+                    audioPlayer.src = data.audio_url;
                     document.getElementById('karaokeSection').style.display = 'block';
                     animateKaraoke();
                 });
@@ -133,48 +128,75 @@
 
         function splitIntoLines(words, wordsPerLine = 7) {
             const lines = [];
-            for (let i = 0; i < words.length; i += wordsPerLine) {
-                const lineWords = words.slice(i, i + wordsPerLine);
-                lines.push(lineWords.map(wordObj => wordObj.word).join(' '));
+            let currentLine = [];
+            words.forEach(wordObj => {
+                currentLine.push(wordObj);
+                if (currentLine.length === wordsPerLine) {
+                    lines.push(currentLine);
+                    currentLine = [];
+                }
+            });
+            if (currentLine.length > 0) {
+                lines.push(currentLine);
             }
             return lines;
         }
 
         function renderKaraoke() {
-            topLine.innerHTML = lines[0] || '';
-            bottomText.innerHTML = lines[1] || '';
+            topLine.innerHTML = formatLine(lines[0]) || '';
+            bottomLine.innerHTML = formatLine(lines[1]) || '';
+        }
+
+        function formatLine(line) {
+            return line
+                ? line.map((wordObj, index) =>
+                      `<span>${wordObj.word}</span>`
+                  ).join(' ')
+                : '';
         }
 
         function animateKaraoke() {
             audioPlayer.addEventListener('timeupdate', () => {
                 const currentTime = audioPlayer.currentTime;
 
-                let activeLineIndex = -1;
-
+                let activeWordIndex = -1;
                 for (let i = 0; i < words.length; i++) {
                     const word = words[i];
                     if (currentTime >= word.start && currentTime <= word.end) {
-                        activeLineIndex = Math.floor(i / 7);
+                        activeWordIndex = i;
                         break;
                     }
                 }
 
+                const activeLineIndex = Math.floor(activeWordIndex / 7);
                 if (activeLineIndex !== -1 && activeLineIndex !== currentLineIndex) {
                     currentLineIndex = activeLineIndex;
                     updateKaraokeView();
                 }
+
+                updateHighlightedWord(activeWordIndex);
             });
         }
 
         function updateKaraokeView() {
-            const currentLine = lines[currentLineIndex] || '';
-            const nextLine = lines[currentLineIndex + 1] || '';
+            const currentLine = lines[currentLineIndex] || [];
+            const nextLine = lines[currentLineIndex + 1] || [];
 
-            // Aktualizacja treści
-            topLine.innerHTML = `<span class="current-line">${currentLine}</span>`;
-            bottomText.textContent = nextLine;
+            topLine.innerHTML = formatLine(currentLine);
+            bottomLine.innerHTML = formatLine(nextLine);
+        }
 
-           
+        function updateHighlightedWord(activeWordIndex) {
+            const allLines = [topLine, bottomLine];
+            allLines.forEach((lineDiv, lineIndex) => {
+                const line = lines[currentLineIndex + lineIndex] || [];
+                lineDiv.innerHTML = line
+                    .map((wordObj, index) => {
+                        const isActive = words.indexOf(wordObj) === activeWordIndex;
+                        return `<span class="${isActive ? 'current-line' : ''}">${wordObj.word}</span>`;
+                    })
+                    .join(' ');
+            });
         }
     </script>
 </body>
