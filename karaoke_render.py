@@ -55,9 +55,14 @@ def render_karaoke(instrumental, lrc_file, output_mp4):
     total_frames = int(math.ceil(duration * FPS))
     frames = []
 
-    print("🎬 Render klatek:", total_frames)
+    print(f"🎬 Render klatek: {total_frames} (czas: {duration:.1f}s)")
 
     for frame_idx in range(total_frames):
+        # Progressbar co 30 ramek
+        if frame_idx % 30 == 0 and frame_idx > 0:
+            progress_pct = (frame_idx / total_frames) * 100
+            print(f"   ⏳ Postęp: {frame_idx}/{total_frames} ({progress_pct:.1f}%)")
+
         t = frame_idx / FPS
 
         screen = pygame.Surface((WIDTH, HEIGHT))

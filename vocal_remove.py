@@ -7,19 +7,39 @@ import torch
 MODEL = "mdx_extra_q"
 TEMP_DIR = "temp"
 
-def remove_vocals(audio_path, output_path):
-    # Wykrywanie GPU
+def remove_vocals(audio_path, output_path, mode="quality"):
+    """
+    Usuwa wokal z piosenki przy użyciu Demucs.
+    
+    Args:
+        audio_path: ścieżka do pliku audio
+        output_path: ścieżka do zapisu instrumentu
+        mode: "quality" (domyślnie) lub "speed"
+              - "quality": shifts=4, segment=24 (lepszy wynik, wolniej)
+              - "speed": shifts=1, segment=30 (szybciej, -10% jakości)
+    """
+    
+    # Wykrywanie GPU i GPU memory optimization
     if torch.cuda.is_available():
         device = "cuda"
+        # Czyszczenie cache GPU przed przetwarzaniem
+        torch.cuda.empty_cache()
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+        print(f"✓ GPU dostępne ({gpu_memory:.1f} GB)")
     else:
         device = "cpu"
-    print(f"Wykorzystywane urządzenie: {device}")
+        print("⚠ GPU nieznalezione, używam CPU (wolniej)")
 
-    # Parametry przyspieszające, bez ryzyka OOM na 4GB GPU
-    shifts = "1"    # minimalna liczba shiftów → szybciej
-    segment = "10"  # krótkie segmenty, mniej VRAM
+    # Parametry zależy od trybu
+    if mode == "speed":
+        shifts = "1"       # Minimum shifts
+        segment = "30"     # Max segment dla CPU/mały GPU
+        print(f"⚡ Tryb SPEED: szybsze przetwarzanie")
+    else:  # quality (domyślnie)
+        shifts = "4"       # 4x lepszej jakości (audio shifts)
+        segment = "24"     # Dłuższe segmenty = lepsze kontekst
+        print(f"🎯 Tryb QUALITY: wyższa jakość")
 
-    # Używamy raw string lub podwójnych backslashy w ścieżce, żeby Windows nie psuł demucsa
     audio_path_fixed = os.path.abspath(audio_path)
 
     cmd = [
@@ -33,8 +53,12 @@ def remove_vocals(audio_path, output_path):
         "--device", device
     ]
 
-    print("Uruchamiam Demucs...")
-    subprocess.run(cmd, check=True)
+    print(f"🎧 Uruchamiam Demucs (device: {device}, shifts: {shifts}, segment: {segment})...")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Błąd Demucs: {e}")
+        raise
 
     # Budowanie ścieżki do pliku wynikowego
     track_name = os.path.splitext(os.path.basename(audio_path_fixed))[0]
@@ -48,7 +72,11 @@ def remove_vocals(audio_path, output_path):
     # Przenoszenie pliku wynikowego
     shutil.move(src, output_path)
 
-    print(f"Plik instrumentalny zapisany jako: {output_path}")
+    # Czyszczenie GPU cache po przetwarzaniu
+    if device == "cuda":
+        torch.cuda.empty_cache()
+
+    print(f"✅ Instrument zapisany: {output_path}")
     return output_path
 
 # --- Przykładowe użycie ---

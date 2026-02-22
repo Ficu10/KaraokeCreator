@@ -1,7 +1,7 @@
 import sys
 import os
 import traceback
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QComboBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -36,6 +36,34 @@ class KaraokeStudio(QWidget):
         header.setFont(QFont("Arial", 48, QFont.Bold))
         header.setStyleSheet("color: white;")
         main_layout.addWidget(header)
+
+        # --- Tryb przetwarzania ---
+        mode_layout = QHBoxLayout()
+        mode_layout.setSpacing(15)
+        mode_label = QLabel("⚙ Tryb Demucs:")
+        mode_label.setFont(QFont("Arial", 12, QFont.Bold))
+        mode_label.setStyleSheet("color: white;")
+        
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("🎯 Wysoka jakość (wolniej)", "quality")
+        self.mode_combo.addItem("⚡ Szybki (szybciej)", "speed")
+        self.mode_combo.setCurrentIndex(0)
+        self.mode_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #b572d4;
+                color: white;
+                border: 2px solid white;
+                border-radius: 8px;
+                padding: 5px;
+                font-weight: bold;
+            }
+        """)
+        
+        mode_layout.addStretch()
+        mode_layout.addWidget(mode_label)
+        mode_layout.addWidget(self.mode_combo)
+        mode_layout.addStretch()
+        main_layout.addLayout(mode_layout)
 
         # --- Przyciski ---
         buttons_layout = QHBoxLayout()
@@ -173,13 +201,18 @@ class KaraokeStudio(QWidget):
             QMessageBox.warning(self, "Błąd", "❌ Najpierw wykonaj TIMING")
             return
 
+        # Pobierz wybrany tryb z combo box'a
+        mode = self.mode_combo.currentData()
+        mode_name = self.mode_combo.currentText()
+
         print("=== DEMUCS START ===")
         print("AUDIO:", self.audio)
         print("OUTPUT WAV:", self.instrumental)
+        print(f"MODE: {mode_name}")
 
         try:
-            remove_vocals(self.audio, self.instrumental)
-            QMessageBox.information(self, "Gotowe", "✅ Wokal usunięty\nUtworzono instrumental.wav")
+            remove_vocals(self.audio, self.instrumental, mode=mode)
+            QMessageBox.information(self, "Gotowe", f"✅ Wokal usunięty\n({mode_name})\nUtworzono instrumental.wav")
         except Exception:
             traceback.print_exc()
             QMessageBox.critical(self, "Błąd DEMUCS", "❌ Sprawdź konsolę (traceback)")
