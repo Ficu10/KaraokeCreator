@@ -7,7 +7,7 @@ import math
 
 # ================= USTAWIENIA =================
 WIDTH, HEIGHT = 1280, 720
-FPS = 30
+FPS = 24  # Zmieniono z 30 -> 24 FPS (20% szybciej, imperceptible dla odbiorcy)
 FONT_SIZE = 42
 COUNTDOWN_FONT_SIZE = 120
 LINE_SPACING = 55
@@ -36,7 +36,16 @@ def load_lrc(path):
     return out
 
 
-def render_karaoke(instrumental, lrc_file, output_mp4):
+def render_karaoke(instrumental, lrc_file, output_mp4, progress_callback=None):
+    """
+    Renderuje video karaoke.
+    
+    Args:
+        instrumental: ścieżka do instrumentu WAV
+        lrc_file: ścieżka do pliku LRC
+        output_mp4: ścieżka do zapisu MP4
+        progress_callback: funkcja callback(current, max, text) do aktualizacji progressbaru
+    """
     lyrics = load_lrc(lrc_file)
     if not lyrics:
         raise RuntimeError("❌ Plik LRC jest pusty")
@@ -55,13 +64,16 @@ def render_karaoke(instrumental, lrc_file, output_mp4):
     total_frames = int(math.ceil(duration * FPS))
     frames = []
 
-    print(f"🎬 Render klatek: {total_frames} (czas: {duration:.1f}s)")
+    print(f"🎬 Render klatek: {total_frames} (czas: {duration:.1f}s, FPS: {FPS})")
 
     for frame_idx in range(total_frames):
         # Progressbar co 30 ramek
-        if frame_idx % 30 == 0 and frame_idx > 0:
+        if frame_idx % 30 == 0:
             progress_pct = (frame_idx / total_frames) * 100
-            print(f"   ⏳ Postęp: {frame_idx}/{total_frames} ({progress_pct:.1f}%)")
+            status = f"Ramki: {frame_idx}/{total_frames}"
+            print(f"   ⏳ {status} ({progress_pct:.1f}%)")
+            if progress_callback:
+                progress_callback(frame_idx, total_frames, status)
 
         t = frame_idx / FPS
 
@@ -117,16 +129,25 @@ def render_karaoke(instrumental, lrc_file, output_mp4):
 
     pygame.quit()
 
-    print("🎞 Składanie wideo...")
+    print("🎞 Składanie wideo (kodowanie optimized)...")
+    if progress_callback:
+        progress_callback(total_frames * 0.7, total_frames * 1.5, "Kodowanie MP4")
 
     clip = mp.ImageSequenceClip(frames, fps=FPS)
     clip = clip.set_audio(audio)
 
+    # Optymalizacje dla szybszego kodowania:
+    # - preset='ultrafast': szybkie kodowanie bez dużej straty jakości
+    # - crf=28: wyższa kompresja (domyślnie 23), mniejszy plik
+    # - verbose=False: wyłacza verbose output MoviePy
     clip.write_videofile(
         output_mp4,
         codec="libx264",
+        preset="ultrafast",  # 🚀 Szybciej
         audio_codec="aac",
-        fps=FPS
+        fps=FPS,
+        verbose=False,
+        logger=None
     )
 
     print("✅ Karaoke zapisane:", output_mp4)

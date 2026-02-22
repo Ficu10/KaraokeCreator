@@ -1,8 +1,8 @@
 import sys
 import os
 import traceback
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QComboBox
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QComboBox, QProgressBar
+from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QFont
 
 from timing_engine import KaraokeTiming
@@ -103,6 +103,36 @@ class KaraokeStudio(QWidget):
             buttons_layout.addWidget(btn)
 
         main_layout.addLayout(buttons_layout)
+
+        # --- Progressbar ---
+        progress_layout = QHBoxLayout()
+        progress_layout.setSpacing(10)
+        
+        self.progress_label = QLabel("⏳ Oczekiwanie...")
+        self.progress_label.setFont(QFont("Arial", 10))
+        self.progress_label.setStyleSheet("color: white;")
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #555555;
+                border: 2px solid white;
+                border-radius: 8px;
+                text-align: center;
+                color: white;
+            }
+            QProgressBar::chunk {
+                background-color: #00d4ff;
+                border-radius: 6px;
+            }
+        """)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFixedHeight(25)
+        
+        progress_layout.addWidget(self.progress_label, 1)
+        progress_layout.addWidget(self.progress_bar, 2)
+        
+        main_layout.addLayout(progress_layout)
         self.setLayout(main_layout)
 
         # ===== ŚCIEŻKI =====
@@ -117,6 +147,27 @@ class KaraokeStudio(QWidget):
         self.btn_vocals.clicked.connect(self.run_vocals)
         self.btn_render.clicked.connect(self.run_render)
         self.btn_render_words.clicked.connect(self.run_render_words)
+
+    # ================== PROGRESS BAR HELPERS ==================
+    def show_progress(self, max_value=100):
+        """Pokaż progressbar"""
+        self.progress_bar.setMaximum(max_value)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        self.progress_label.setText("⏳ Przetwarzanie...")
+        
+    def update_progress(self, value, text=""):
+        """Zaktualizuj progressbar"""
+        self.progress_bar.setValue(value)
+        if text:
+            percentage = int((value / self.progress_bar.maximum()) * 100)
+            self.progress_label.setText(f"⏳ {text} ({percentage}%)")
+        QApplication.processEvents()  # Refresh GUI
+            
+    def hide_progress(self):
+        """Ukryj progressbar"""
+        self.progress_bar.setVisible(False)
+        self.progress_label.setText("✅ Gotowe!")
 
     # ================== TIMING SŁÓW ==================
     def run_timing_words(self):
@@ -152,14 +203,18 @@ class KaraokeStudio(QWidget):
         song_name = os.path.splitext(os.path.basename(self.audio))[0]
         output_video = os.path.join(OUTPUT_DIR, f"{song_name}_words.mp4")
 
+        self.show_progress(100)
         try:
             render_karaoke_words(
                 instrumental=self.instrumental,
                 lrc_file=self.lrc,
-                output_mp4=output_video
+                output_mp4=output_video,
+                progress_callback=self.update_progress
             )
+            self.hide_progress()
             QMessageBox.information(self, "Sukces 🎉", f"✅ Karaoke słów zapisane:\n{output_video}")
         except Exception:
+            self.hide_progress()
             traceback.print_exc()
             QMessageBox.critical(self, "Błąd renderowania słów", "❌ Sprawdź konsolę (traceback)")
 
@@ -210,10 +265,13 @@ class KaraokeStudio(QWidget):
         print("OUTPUT WAV:", self.instrumental)
         print(f"MODE: {mode_name}")
 
+        self.show_progress(100)
         try:
-            remove_vocals(self.audio, self.instrumental, mode=mode)
+            remove_vocals(self.audio, self.instrumental, mode=mode, progress_callback=self.update_progress)
+            self.hide_progress()
             QMessageBox.information(self, "Gotowe", f"✅ Wokal usunięty\n({mode_name})\nUtworzono instrumental.wav")
         except Exception:
+            self.hide_progress()
             traceback.print_exc()
             QMessageBox.critical(self, "Błąd DEMUCS", "❌ Sprawdź konsolę (traceback)")
 
@@ -230,10 +288,18 @@ class KaraokeStudio(QWidget):
         output_video = os.path.join(OUTPUT_DIR, f"{song_name}.mp4")
 
         print("=== RENDER START ===")
+        self.show_progress(100)
         try:
-            render_karaoke(instrumental=self.instrumental, lrc_file=self.lrc, output_mp4=output_video)
+            render_karaoke(
+                instrumental=self.instrumental, 
+                lrc_file=self.lrc, 
+                output_mp4=output_video,
+                progress_callback=self.update_progress
+            )
+            self.hide_progress()
             QMessageBox.information(self, "Sukces 🎉", f"✅ Karaoke zapisane:\n{output_video}")
         except Exception:
+            self.hide_progress()
             traceback.print_exc()
             QMessageBox.critical(self, "Błąd renderowania", "❌ Sprawdź konsolę (traceback)")
 

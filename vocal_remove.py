@@ -7,7 +7,7 @@ import torch
 MODEL = "mdx_extra_q"
 TEMP_DIR = "temp"
 
-def remove_vocals(audio_path, output_path, mode="quality"):
+def remove_vocals(audio_path, output_path, mode="quality", progress_callback=None):
     """
     Usuwa wokal z piosenki przy użyciu Demucs.
     
@@ -17,6 +17,7 @@ def remove_vocals(audio_path, output_path, mode="quality"):
         mode: "quality" (domyślnie) lub "speed"
               - "quality": shifts=4, segment=24 (lepszy wynik, wolniej)
               - "speed": shifts=1, segment=30 (szybciej, -10% jakości)
+        progress_callback: funkcja callback(current, max, text) do aktualizacji progressbaru
     """
     
     # Wykrywanie GPU i GPU memory optimization
@@ -54,6 +55,8 @@ def remove_vocals(audio_path, output_path, mode="quality"):
     ]
 
     print(f"🎧 Uruchamiam Demucs (device: {device}, shifts: {shifts}, segment: {segment})...")
+    if progress_callback:
+        progress_callback(0, 100, "Demucs: przetwarzanie...")
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
@@ -75,6 +78,9 @@ def remove_vocals(audio_path, output_path, mode="quality"):
     # Czyszczenie GPU cache po przetwarzaniu
     if device == "cuda":
         torch.cuda.empty_cache()
+
+    if progress_callback:
+        progress_callback(100, 100, "Demucs: gotowe!")
 
     print(f"✅ Instrument zapisany: {output_path}")
     return output_path
