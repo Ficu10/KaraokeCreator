@@ -52,6 +52,21 @@ python app.py
 4. **Generuj** - Stwórz wideo karaoke z całymi liniami tekstu
 5. **Render słów** - Stwórz wideo karaoke z synchronizacją słów
 
+### ⚡ Tryby przetwarzania Demucs
+
+Aplikacja posiada **dwa tryby przetwarzania** do wyboru w GUI:
+
+| Tryb | Speed | Jakość | VRAM | Uwagi |
+|------|-------|--------|------|-------|
+| **🎯 Wysoka jakość** | ~5-10 min | ⭐⭐⭐⭐⭐ | 2-4 GB | Domyślnie, `shifts=4, segment=24` |
+| **⚡ Szybki** | ~2-3 min | ⭐⭐⭐⭐ | 1-2 GB | `shifts=1, segment=30`, -10% jakości |
+
+**Automatyczne optymalizacje:**
+- ✅ GPU memory cache clearing
+- ✅ Dynamiczny wybór device (CUDA/CPU)
+- ✅ Progressbar podczas renderowania wideo
+- ✅ Error handling z szczegółowymi komunikatami
+
 ## 📁 Struktura projektu
 
 ```
@@ -104,19 +119,31 @@ Aplikacja wykorzystuje:
 
 ## 🔧 Troubleshooting
 
-### Błąd CUDA / GPU
-```bash
-# Jeśli masz problemy z GPU, użyj CPU:
-# Zmień w vocal_remove.py: device = "cpu"
+### 🖥️ GPU / CUDA problemy
+
+App automatycznie wykrywa GPU i fallback na CPU. Jeśli masz problemy:
+
+```python
+# vocal_remove.py - force CPU:
+device = "cpu"  # zamiast auto-detection
 ```
 
-### Brak wokalu w wynikach
-- Spróbuj zmienić model w `vocal_remove.py`
-- Upewnij się, że masz wystarczająco VRAM
+**Problemy z OOM (Out of Memory)?**
+- Wybierz tryb **⚡ Szybki** w GUI (mniejsze segment)
+- Zmniejsz `segment` z 24 na 20 w `vocal_remove.py`
+- Uruchom na CPU (wolniej, ale mniej RAM)
 
-### Desynchronizacja tekstu
-- Zwiększ dokładność w `timing_engine.py`
-- Ręcznie popraw czasowe znaczniki w LRC
+### 🎙️ Zła separacja wokal/instrument
+
+- Spróbuj drugiego trybu (quality ↔ speed)
+- Sprawdź jakość wejściowego audio (MP3 320kbps vs 128kbps)
+- Exponuj piosenkomówanie w odpowiednim formacie
+
+### 🎬 Desynchronizacja tekstu
+
+- Używaj opcji **Timing słów** dla większej precyzji
+- Ręcznie popraw pliki `.lrc` w notatniku
+- Format: `[MM:SS.cs]tekst` (centisekundy, nie milisekundy!)
 
 ## 📄 Licencja
 
