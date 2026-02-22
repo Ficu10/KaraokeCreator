@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karaoke Processor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #222;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            margin: 20px 0;
+        }
+
+        #uploadForm {
+            margin-bottom: 20px;
+        }
+
+        #karaokeSection {
+            display: none;
+            margin-top: 20px;
+        }
+
+        #audioPlayer {
+            width: 80%;
+            margin-bottom: 20px;
+        }
+
+        #karaokeContainer {
+            width: 80%;
+            margin: 0 auto;
+            overflow: hidden;
+            position: relative;
+            height: 150px;
+            background: black;
+            border: 2px solid #444;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #topLine, #bottomLine {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 30px;
+            transition: transform 0.5s ease-in-out;
+            color: #aaa;
+        }
+
+        #topLine {
+            top: 10px;
+        }
+
+        #bottomLine {
+            bottom: 10px;
+            color: #ccc;
+        }
+
+        .current-line {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Karaoke Processor</h1>
+
+    <form id="uploadForm">
+        <label for="audioFile">Wybierz plik audio:</label>
+        <input type="file" id="audioFile" name="audio" accept=".mp3,.wav" required>
+        <label for="language">Wybierz język:</label>
+        <select id="language" name="language">
+            <option value="pl" selected>Polski</option>
+            <option value="en">Angielski</option>
+            <option value="es">Hiszpański</option>
+        </select>
+        <button type="button" id="transcribeBtn">Transkrybuj</button>
+    </form>
+
+    <div id="karaokeSection">
+        <audio id="audioPlayer" controls></audio>
+        <div id="karaokeContainer">
+            <div id="topLine"></div>
+            <div id="bottomLine"></div>
+        </div>
+    </div>
+
+    <script>
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const audioFile = document.getElementById('audioFile');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const topLine = document.getElementById('topLine');
+        const bottomLine = document.getElementById('bottomLine');
+        const languageSelect = document.getElementById('language');
+
+        let words = [];
+        let lines = [];
+        let currentLineIndex = 0;
+
+        transcribeBtn.addEventListener('click', () => {
+            const formData = new FormData();
+            formData.append('audio', audioFile.files[0]);
+            formData.append('language', languageSelect.value);
+
+            fetch('/process', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    words = data.transcription;
+                    lines = splitIntoLines(words, 7); // Podział na linie po 7 słów
+                    renderKaraoke();
+
+                    audioPlayer.src = data.audio_url;
+                    document.getElementById('karaokeSection').style.display = 'block';
+                    animateKaraoke();
+                });
+        });
+
+        function splitIntoLines(words, wordsPerLine = 7) {
+            const lines = [];
+            let currentLine = [];
+            words.forEach(wordObj => {
+                currentLine.push(wordObj);
+                if (currentLine.length === wordsPerLine) {
+                    lines.push(currentLine);
+                    currentLine = [];
+                }
+            });
+            if (currentLine.length > 0) {
+                lines.push(currentLine);
+            }
+            return lines;
+        }
+
+        function renderKaraoke() {
+            topLine.innerHTML = formatLine(lines[0]) || '';
+            bottomLine.innerHTML = formatLine(lines[1]) || '';
+        }
+
+        function formatLine(line) {
+            return line
+                ? line.map((wordObj, index) =>
+                      `<span>${wordObj.word}</span>`
+                  ).join(' ')
+                : '';
+        }
+
+        function animateKaraoke() {
+            audioPlayer.addEventListener('timeupdate', () => {
+                const currentTime = audioPlayer.currentTime;
+
+                let activeWordIndex = -1;
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    if (currentTime >= word.start && currentTime <= word.end) {
+                        activeWordIndex = i;
+                        break;
+                    }
+                }
+
+                const activeLineIndex = Math.floor(activeWordIndex / 7);
+                if (activeLineIndex !== -1 && activeLineIndex !== currentLineIndex) {
+                    currentLineIndex = activeLineIndex;
+                    updateKaraokeView();
+                }
+
+                updateHighlightedWord(activeWordIndex);
+            });
+        }
+
+        function updateKaraokeView() {
+            const currentLine = lines[currentLineIndex] || [];
+            const nextLine = lines[currentLineIndex + 1] || [];
+
+            topLine.innerHTML = formatLine(currentLine);
+            bottomLine.innerHTML = formatLine(nextLine);
+        }
+
+        function updateHighlightedWord(activeWordIndex) {
+            const allLines = [topLine, bottomLine];
+            allLines.forEach((lineDiv, lineIndex) => {
+                const line = lines[currentLineIndex + lineIndex] || [];
+                lineDiv.innerHTML = line
+                    .map((wordObj, index) => {
+                        const isActive = words.indexOf(wordObj) === activeWordIndex;
+                        return `<span class="${isActive ? 'current-line' : ''}">${wordObj.word}</span>`;
+                    })
+                    .join(' ');
+            });
+        }
+    </script>
+</body>
+</html>
