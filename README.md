@@ -64,8 +64,13 @@ Aplikacja posiada **dwa tryby przetwarzania** do wyboru w GUI:
 **Automatyczne optymalizacje:**
 - ✅ GPU memory cache clearing
 - ✅ Dynamiczny wybór device (CUDA/CPU)
-- ✅ Progressbar podczas renderowania wideo
+- ✅ **Progressbar na każdą czynność** (Timing, Demucs, Render)
 - ✅ Error handling z szczegółowymi komunikatami
+
+**Przyspieszenie renderowania MP4:**
+- 📊 FPS zmieniono z 30 → 24 (20% szybciej, não perceptible)
+- ⚙️ Codec preset: `ultrafast` (szybsze kodowanie)
+- 📉 Verbose output wyłączony (mniej spowolnienia)
 
 ## 📁 Struktura projektu
 
@@ -96,9 +101,24 @@ Druga linia tekstu
 Trzecia linia tekstu
 ```
 
+## 📊 Paski postępu (Progress Bars)
+
+Każda operacja w aplikacji wyświetla pasek postępu w interfejsie GUI:
+
+| Operacja | Postęp | Info |
+|----------|--------|------|
+| **Timing** | Interaktywny (SPACE) | Pokazuje liczbę zsynchronizowanych linijek |
+| **🎧 Usuń wokal** | 0-100% | Demucs: przetwarzanie... |
+| **🎬 Render MP4** | 0-100% | Pokazuje liczbę przetworzonych ramek |
+
+**Jak interpretować progressbar:**
+- Niebieski pasek wypełnia się od lewej do prawej
+- Obok wyświetla się procentowy postęp i nazwa operacji
+- Po ukończeniu appears komunikat "✅ Gotowe!"
+
 ## 🎬 Format wyjściowy
 
-- **Wideo karaoke**: MP4 (1280x720, 30 FPS)
+- **Wideo karaoke**: MP4 (1280x720, **24 FPS** - optimized)
 - **Format LRC**: Plik .lrc z zeitowaniem
 - **Instrument**: WAV bez wokalu
 
@@ -144,6 +164,17 @@ device = "cpu"  # zamiast auto-detection
 - Używaj opcji **Timing słów** dla większej precyzji
 - Ręcznie popraw pliki `.lrc` w notatniku
 - Format: `[MM:SS.cs]tekst` (centisekundy, nie milisekundy!)
+
+### ⏱️ Renderowanie MP4 zajmuje zbyt długo?
+
+Aplikacja już ma wbudowaną optymalizację:
+- **FPS:** 24 fps (zamiast 30) = 20% szybciej
+- **Preset:** `ultrafast` dla libx264 (3x szybciej, minimalna strata jakości)
+- **Verbose:** Wyłączony (oszczędzanie CPU)
+
+Jeśli nadal za wolno:
+- Usuń dwie ostatnie linie wideo: `karaoke_render.py` linia 130-131
+- Zmniejsz rozdzielczość z 1280x720 na 640x360 (4x szybciej)
 
 ## 📄 Licencja
 
